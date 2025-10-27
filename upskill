@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+set -Eeo pipefail
+IFS=$'\n\t'
+
+PROGRAM_NAME="upskill"
+VERSION="0.1.0"
+
+usage() {
+  cat <<USAGE
+${PROGRAM_NAME} ${VERSION}
+Install Claude/Agent skills from another GitHub repository.
+
+Usage:
+  ${PROGRAM_NAME} <owner/repo> [-b <branch>] [--skills-path <path>]
+
+Examples:
+  ${PROGRAM_NAME} adobe/helix-website -b agent-skills
+
+Options:
+  -b, --branch <branch>     Branch, tag, or commit to clone (default: repo default)
+  --skills-path <path>      Path to skills in source repo (default: .claude/skills)
+  -q, --quiet               Reduce output
+  -h, --help                Show help
+  -v, --version             Show version
+USAGE
+}
+
+log() {
+  if [[ -z "${QUIET:-}" ]]; then
+    printf '%s\n' "$*" >&2
+  fi
+}
+
+die() {
+  printf 'Error: %s\n' "$*" >&2
+  exit 1
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
+}
+
+cleanup() {
+  if [[ -n "${_UPS_TMPDIR:-}" && -d "${_UPS_TMPDIR}" ]]; then
+    rm -rf "${_UPS_TMPDIR}" || true
+  fi
+}
+trap cleanup EXIT
+
+insert_or_replace_block() {
+  # $1: target file
+  # $2: start marker
+  # $3: end marker
+  # stdin: block content (without markers)
+  local file="$1"; shift
+  local start_marker="$1"; shift
+  local end_marker="$1"; shift
+
+  local block tmp blockfile
+  block=$(cat)
+
+  if [[ ! -f "$file" ]]; then
+    printf '%s\n\n%s\n%s\n%s\n' "# AGENTS.md" "$start_marker" "$block" "$end_marker" >"$file"
+    return 0
+  fi
+
+  if grep -qF "$start_marker" "$file" && grep -qF "$end_marker" "$file"; then
+    tmp=$(mktemp)
+    blockfile=$(mktemp)
+    printf '%s\n' "$block" >"$blockfile"
+    awk -v start="$start_marker" -v end="$end_marker" -v fblock="$blockfile" '
+      BEGIN{skip=0}
+      $0 ~ start {
+        print $0
+        # print replacement content
+        cmd = "cat " fblock
+        while ((cmd | getline line) > 0) print line
+        close(cmd)
+        skip=1
+        next
+      }
+      $0 ~ end && skip==1 { print $0; skip=0; next }
+      skip==1 { next }
+      { print $0 }
+    ' "$file" >"$tmp"
+    mv "$tmp" "$file"
+    rm -f "$blockfile"
+  else
+    {
+      printf '\n%s\n' "$start_marker"
+      printf '%s\n' "$block"
+      printf '%s\n' "$end_marker"
+    } >>"$file"
+  fi
+}
+
+generate_discover_skills() {
+  cat <<'SCRIPT'
+#!/usr/bin/env bash
+set -Eeo pipefail
+IFS=$'\n\t'
+
+# Discover available skills in .claude/skills/
+# Usage: .agents/discover-skills
+
+SKILLS_DIR="${SKILLS_DIR:-.claude/skills}"
+
+if [[ ! -d "$SKILLS_DIR" ]]; then
+  echo "No skills directory found at $SKILLS_DIR"
+  exit 0
+fi
+
+echo "Available Skills:"
+echo "=================="
+echo ""
+
+# Iterate SKILL.md files robustly (handles spaces)
+while IFS= read -r -d '' skill_file; do
+  skill_dir=$(dirname "$skill_file")
+  skill_name=$(basename "$skill_dir")
+
+  # Check for YAML frontmatter
+  if head -n 1 "$skill_file" | grep -q "^---$"; then
+    # Extract lines between first pair of --- delimiters
+    frontmatter=$(awk 'BEGIN{in=0} /^---$/ {in=!in; if(++c==3) exit} in==1 {print}' "$skill_file")
+    name=$(printf '%s\n' "$frontmatter" | awk -F': *' '/^name:/ {sub(/^name: */,"",$0); print substr($0, index($0,$2))}' 2>/dev/null)
+    description=$(printf '%s\n' "$frontmatter" | awk -F': *' '/^description:/ {sub(/^description: */,"",$0); print substr($0, index($0,$2))}' 2>/dev/null)
+
+    echo "Skill: ${name:-$skill_name}"
+    echo "Path: $skill_file"
+    if [[ -n "$description" ]]; then
+      echo "Description: $description"
+    fi
+  else
+    echo "Skill: $skill_name"
+    echo "Path: $skill_file"
+    echo "Description:"
+    head -n 5 "$skill_file"
+  fi
+
+  echo ""
+  echo "---"
+  echo ""
+done < <(find "$SKILLS_DIR" -type f -name 'SKILL.md' -print0)
+SCRIPT
+}
+
+copy_tree() {
+  # $1: src dir, $2: dest dir
+  local src="$1" dest="$2"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a "$src/" "$dest/"
+  else
+    tar -C "$src" -cf - . | tar -C "$dest" -xpf -
+  fi
+}
+
+main() {
+  local repo=""
+  local branch=""
+  local skills_rel_path=".claude/skills"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help) usage; exit 0 ;;
+      -v|--version) echo "$PROGRAM_NAME $VERSION"; exit 0 ;;
+      -q|--quiet) QUIET=1; shift ;;
+      -b|--branch) branch="$2"; shift 2 ;;
+      --skills-path) skills_rel_path="$2"; shift 2 ;;
+      -*) die "Unknown option: $1" ;;
+      *) repo="$1"; shift ;;
+    esac
+  done
+
+  [[ -n "$repo" ]] || { usage; die "Missing required <owner/repo>"; }
+
+  require_cmd gh
+  require_cmd git
+  require_cmd awk
+  require_cmd sed
+  require_cmd tar
+
+  _UPS_TMPDIR=$(mktemp -d)
+  log "Created temp dir: $_UPS_TMPDIR"
+
+  local clone_dir
+  clone_dir="$_UPS_TMPDIR/src"
+
+  if [[ -n "$branch" ]]; then
+    log "Cloning $repo (branch: $branch) ..."
+    gh repo clone "$repo" "$clone_dir" -b "$branch" >/dev/null
+  else
+    log "Cloning $repo ..."
+    gh repo clone "$repo" "$clone_dir" >/dev/null
+  fi
+
+  local src_skills_dir
+  src_skills_dir="$clone_dir/$skills_rel_path"
+  [[ -d "$src_skills_dir" ]] || die "Source skills directory not found: $src_skills_dir"
+
+  local dest_skills_dir
+  dest_skills_dir=".claude/skills"
+  mkdir -p "$dest_skills_dir"
+  log "Copying skills from $src_skills_dir to $dest_skills_dir ..."
+  copy_tree "$src_skills_dir" "$dest_skills_dir"
+
+  # Write .agents/discover-skills
+  mkdir -p .agents
+  local discover
+  discover=".agents/discover-skills"
+  log "Updating $discover ..."
+  generate_discover_skills >"$discover"
+  chmod +x "$discover"
+
+  # Extract Skills section from source AGENTS.md
+  local src_agents
+  src_agents="$clone_dir/AGENTS.md"
+  if [[ -f "$src_agents" ]]; then
+    log "Updating AGENTS.md skills section ..."
+    local block
+    block=$(awk '/^## Skills/{flag=1; print; next} /^## / && flag{exit} flag{print}' "$src_agents")
+    if [[ -z "$block" ]]; then
+      log "Warning: could not extract Skills section from $src_agents"
+    else
+      local start_marker end_marker
+      start_marker='<!-- upskill:skills:start -->'
+      end_marker='<!-- upskill:skills:end -->'
+      insert_or_replace_block "AGENTS.md" "$start_marker" "$end_marker" <<<"$block"
+    fi
+  else
+    log "Warning: AGENTS.md not found in source repo, skipping skills section"
+  fi
+
+  log "Done."
+}
+
+main "$@"
+
