@@ -47,7 +47,7 @@ count_markers2=$(grep -cF "$marker_start" AGENTS.md)
 echo "Running discover-skills ..."
 out="$(.agents/discover-skills | sed -n '1,40p')"
 echo "$out" | grep -q "Available Skills:" || { echo "FAIL: discover-skills header missing"; exit 1; }
-echo "$out" | grep -q "---" || { echo "FAIL: discover-skills separator missing"; exit 1; }
+echo "$out" | grep -q -- "---" || { echo "FAIL: discover-skills separator missing"; exit 1; }
 
 echo "OK"
 

@@ -122,7 +122,7 @@ while IFS= read -r -d '' skill_file; do
   # Check for YAML frontmatter
   if head -n 1 "$skill_file" | grep -q "^---$"; then
     # Extract lines between first pair of --- delimiters
-    frontmatter=$(awk 'BEGIN{in=0} /^---$/ {in=!in; if(++c==3) exit} in==1 {print}' "$skill_file")
+    frontmatter=$(awk 'BEGIN{inside=0; c=0} /^---$/ {inside=!inside; if(++c==3) exit} inside==1 {print}' "$skill_file")
     name=$(printf '%s\n' "$frontmatter" | awk -F': *' '/^name:/ {sub(/^name: */,"",$0); print substr($0, index($0,$2))}' 2>/dev/null)
     description=$(printf '%s\n' "$frontmatter" | awk -F': *' '/^description:/ {sub(/^description: */,"",$0); print substr($0, index($0,$2))}' 2>/dev/null)
 
@@ -188,7 +188,7 @@ main() {
 
   if [[ -n "$branch" ]]; then
     log "Cloning $repo (branch: $branch) ..."
-    gh repo clone "$repo" "$clone_dir" -b "$branch" >/dev/null
+    gh repo clone "$repo" "$clone_dir" -- -b "$branch" >/dev/null
   else
     log "Cloning $repo ..."
     gh repo clone "$repo" "$clone_dir" >/dev/null
@@ -235,4 +235,3 @@ main() {
 }
 
 main "$@"
-
