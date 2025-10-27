@@ -1,3 +1,5 @@
+![Upskill – Install Agent Skills](hero-banner.jpeg)
+
 # upskill
 
 Quickly install Claude/Agent skills from another repository. Works standalone and as a `gh` extension.
