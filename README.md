@@ -65,3 +65,13 @@ This safely scans `.claude/skills/**/SKILL.md` (handles spaces) and prints names
 - Requires `gh` CLI for cloning, `git`, and standard Unix tools.
 - If the source AGENTS.md does not contain a `## Skills` section, the update is skipped.
 - The generated `./.agents/discover-skills` improves robustness over the reference script (handles spaces; strict mode).
+
+## Related Projects
+
+Part of the **[AI Ecoverse](https://github.com/trieloff/ai-ecoverse)** - a comprehensive ecosystem of tools for AI-assisted development:
+- [yolo](https://github.com/trieloff/yolo) - AI CLI launcher with worktree isolation
+- [ai-aligned-git](https://github.com/trieloff/ai-aligned-git) - Git wrapper for safe AI commit practices
+- [ai-aligned-gh](https://github.com/trieloff/ai-aligned-gh) - GitHub CLI wrapper for proper AI attribution
+- [vibe-coded-badge-action](https://github.com/trieloff/vibe-coded-badge-action) - Badge showing AI-generated code percentage
+- [gh-workflow-peek](https://github.com/trieloff/gh-workflow-peek) - Smarter GitHub Actions log filtering
+- [as-a-bot](https://github.com/trieloff/as-a-bot) - GitHub App token broker for proper AI attribution
