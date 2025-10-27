@@ -11,12 +11,13 @@ ${PROGRAM_NAME} ${VERSION}
 Install Claude/Agent skills from another GitHub repository.
 
 Usage:
-  ${PROGRAM_NAME} <owner/repo> [-b <branch>] [--skills-path <path>]
+  ${PROGRAM_NAME} [-i] <owner/repo> [-b <branch>] [--skills-path <path>]
 
 Examples:
   ${PROGRAM_NAME} adobe/helix-website -b agent-skills
 
 Options:
+  -i                        Add created files to .gitignore
   -b, --branch <branch>     Branch, tag, or commit to clone (default: repo default)
   --skills-path <path>      Path to skills in source repo (default: .claude/skills)
   -q, --quiet               Reduce output
@@ -159,12 +160,14 @@ main() {
   local repo=""
   local branch=""
   local skills_rel_path=".claude/skills"
+  local add_to_gitignore=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -h|--help) usage; exit 0 ;;
       -v|--version) echo "$PROGRAM_NAME $VERSION"; exit 0 ;;
       -q|--quiet) QUIET=1; shift ;;
+      -i) add_to_gitignore=1; shift ;;
       -b|--branch) branch="$2"; shift 2 ;;
       --skills-path) skills_rel_path="$2"; shift 2 ;;
       -*) die "Unknown option: $1" ;;
@@ -229,6 +232,21 @@ main() {
     fi
   else
     log "Warning: AGENTS.md not found in source repo, skipping skills section"
+  fi
+
+  # Optionally append ignore rules
+  if [[ -n "$add_to_gitignore" ]]; then
+    local start_marker end_marker
+    start_marker="# upskill:gitignore:start"
+    end_marker="# upskill:gitignore:end"
+    local block
+    block=$(cat <<'EOB'
+.claude/skills/
+.agents/discover-skills
+EOB
+)
+    insert_or_replace_block ".gitignore" "$start_marker" "$end_marker" <<<"$block"
+    log "Updated .gitignore with upskill block"
   fi
 
   log "Done."

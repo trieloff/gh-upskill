@@ -32,6 +32,7 @@ What this does:
 Options:
 - `-b, --branch <branch>`: use a specific branch, tag, or commit
 - `--skills-path <path>`: change source skills path (default: `.claude/skills`)
+- `-i`: add created files to `.gitignore` (`.claude/skills/` and `.agents/discover-skills`), idempotent via markers
 
 ## Idempotent AGENTS.md updates
 

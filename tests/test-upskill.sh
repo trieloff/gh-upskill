@@ -49,6 +49,20 @@ out="$(.agents/discover-skills | sed -n '1,40p')"
 echo "$out" | grep -q "Available Skills:" || { echo "FAIL: discover-skills header missing"; exit 1; }
 echo "$out" | grep -q -- "---" || { echo "FAIL: discover-skills separator missing"; exit 1; }
 
+# Test gitignore insertion with -i
+echo "Running upskill with -i ..."
+"$ROOT_DIR/upskill" -i adobe/helix-website -b agent-skills
+
+test -f .gitignore || { echo "FAIL: .gitignore not created"; exit 1; }
+grep -qF ".claude/skills/" .gitignore || { echo "FAIL: .gitignore missing skills entry"; exit 1; }
+grep -qF ".agents/discover-skills" .gitignore || { echo "FAIL: .gitignore missing discover entry"; exit 1; }
+
+# Ensure idempotent block
+start_marker="# upskill:gitignore:start"
+[[ $(grep -cF "$start_marker" .gitignore) == "1" ]] || { echo "FAIL: duplicate gitignore block after first -i"; exit 1; }
+"$ROOT_DIR/upskill" -i adobe/helix-website -b agent-skills
+[[ $(grep -cF "$start_marker" .gitignore) == "1" ]] || { echo "FAIL: duplicate gitignore block after second -i"; exit 1; }
+
 echo "OK"
 
 popd >/dev/null
