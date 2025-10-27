@@ -19,5 +19,6 @@ jobs:
           sudo apt-get install -y shellcheck
 
       - name: Run CI
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: make ci
-
