@@ -2,7 +2,7 @@
 set -Eeo pipefail
 IFS=$'\n\t'
 
-REPO="trieloff/upskill"
+REPO="trieloff/gh-upskill"
 RAW_ROOT="https://raw.githubusercontent.com/${REPO}/main"
 
 usage() {

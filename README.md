@@ -7,11 +7,11 @@ Quickly install Claude/Agent skills from another repository. Works standalone an
 ## Install
 
 - Standalone
-  - macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/trieloff/upskill/main/install.sh | bash`
-  - Custom prefix: `curl -fsSL https://raw.githubusercontent.com/trieloff/upskill/main/install.sh | bash -s -- --prefix ~/.local`
+  - macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/trieloff/gh-upskill/main/install.sh | bash`
+  - Custom prefix: `curl -fsSL https://raw.githubusercontent.com/trieloff/gh-upskill/main/install.sh | bash -s -- --prefix ~/.local`
 
 - GitHub CLI extension
-  - `gh extension install trieloff/upskill`
+  - `gh extension install trieloff/gh-upskill`
   - Then run via `gh upskill ...` (or use `upskill` directly)
 
 ## Usage
