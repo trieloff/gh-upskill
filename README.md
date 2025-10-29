@@ -16,22 +16,47 @@ Quickly install Claude/Agent skills from another repository. Works standalone an
 
 ## Usage
 
-Install skills from another repo (same syntax as `gh repo clone`):
+### Install from repositories with `.claude/skills` directory
+
+Install all skills from another repo (same syntax as `gh repo clone`):
 
 ```
 upskill adobe/helix-website -b agent-skills
 ```
 
-What this does:
+### Install from repositories with individual SKILL.md files
+
+For repositories like `anthropics/skills` that don't have a `.claude/skills` directory, you can:
+
+**List available skills:**
+```
+upskill anthropics/skills --list
+```
+
+**Install specific skills:**
+```
+upskill anthropics/skills --skill pdf --skill xlsx
+```
+
+**Install all skills:**
+```
+upskill anthropics/skills --all
+```
+
+### What this does:
 - Creates a temp directory and `gh repo clone`s the source repository
-- Copies everything from `source/.claude/skills` into `./.claude/skills`
+- For repos with `.claude/skills`: copies everything into `./.claude/skills`
+- For repos with `SKILL.md` files: discovers and copies selected skills
 - Creates `./.agents/discover-skills` (robust, shellcheck-friendly)
 - Adds or updates a Skills section in `./AGENTS.md` with clear start/end markers
   - Ensures repeated runs do not duplicate the section
 
-Options:
+### Options:
 - `-b, --branch <branch>`: use a specific branch, tag, or commit
 - `--skills-path <path>`: change source skills path (default: `.claude/skills`)
+- `--list`: list available skills without installing
+- `--skill <name>`: install specific skill(s) (can be used multiple times)
+- `--all`: install all skills from SKILL.md files
 - `-i`: add created files to `.gitignore` (`.claude/skills/` and `.agents/discover-skills`), idempotent via markers
 
 ## Idempotent AGENTS.md updates
