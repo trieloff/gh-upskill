@@ -134,7 +134,8 @@ process_skills_directory() {
   fi
 
   echo "$location_label ($count skill(s)):"
-  echo "$(printf '=%.0s' $(seq 1 ${#location_label}))"
+  printf '%.0s=' $(seq 1 ${#location_label})
+  echo ""
   echo ""
 
   # Iterate SKILL.md files robustly (handles spaces)
