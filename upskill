@@ -133,9 +133,14 @@ process_skills_directory() {
     return 0
   fi
 
+  local len=${#location_label}
+  local underline=""
+  for ((i=0; i<len; i++)); do
+    underline+="="
+  done
+
   echo "$location_label ($count skill(s)):"
-  printf '%.0s=' $(seq 1 ${#location_label})
-  echo ""
+  echo "$underline"
   echo ""
 
   # Iterate SKILL.md files robustly (handles spaces)
