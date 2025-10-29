@@ -186,19 +186,34 @@ discover_skill_files() {
 
 list_skills() {
   # $1: directory to search
+  # $2: optional repo name for examples
   local search_dir="$1"
+  local repo="${2:-<repo>}"
+
+  # ANSI color codes
+  local bold='\033[1m'
+  local cyan='\033[36m'
+  local reset='\033[0m'
 
   echo "Available skills in repository:"
   echo "==============================="
   echo ""
 
   local count=0
+  local -a skill_names=()
   while IFS='|' read -r name path description; do
     ((count++))
-    echo "Skill: $name"
-    echo "Path:  $path"
+    skill_names+=("$name")
+
+    # Make path relative to search_dir
+    local rel_path="${path#"$search_dir"/}"
+
+    # Bold skill name, cyan relative path in parentheses
+    printf "${bold}%s${reset} ${cyan}(%s)${reset}\n" "$name" "$rel_path"
+
+    # Description on next line if present
     if [[ -n "$description" ]]; then
-      echo "Desc:  $description"
+      echo "$description"
     fi
     echo ""
   done < <(discover_skill_files "$search_dir")
@@ -211,10 +226,17 @@ list_skills() {
   echo "Found $count skill(s)"
   echo ""
   echo "To install specific skills:"
-  echo "  $PROGRAM_NAME <repo> --skill <name> [--skill <name> ...]"
+  # Use first two skills in example if available
+  if [[ ${#skill_names[@]} -ge 2 ]]; then
+    echo "  $PROGRAM_NAME $repo --skill ${skill_names[0]} --skill ${skill_names[1]}"
+  elif [[ ${#skill_names[@]} -eq 1 ]]; then
+    echo "  $PROGRAM_NAME $repo --skill ${skill_names[0]}"
+  else
+    echo "  $PROGRAM_NAME $repo --skill <name> [--skill <name> ...]"
+  fi
   echo ""
   echo "To install all skills:"
-  echo "  $PROGRAM_NAME <repo> --all"
+  echo "  $PROGRAM_NAME $repo --all"
 }
 
 copy_skill() {
@@ -306,9 +328,9 @@ main() {
   # Handle --list flag
   if [[ -n "$list_only" ]]; then
     if [[ -n "$has_claude_dir" ]]; then
-      list_skills "$src_skills_dir"
+      list_skills "$src_skills_dir" "$repo"
     else
-      list_skills "$clone_dir"
+      list_skills "$clone_dir" "$repo"
     fi
     exit 0
   fi
@@ -366,7 +388,7 @@ main() {
       # No .claude directory and no flags - show available skills
       echo "No .claude/skills directory found in repository."
       echo ""
-      list_skills "$clone_dir"
+      list_skills "$clone_dir" "$repo"
       echo ""
       rm -f "$tmpfile"
       die "Please specify which skills to install using --skill or --all"
