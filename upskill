@@ -106,7 +106,7 @@ insert_or_replace_block() {
 generate_discover_skills() {
   cat <<'SCRIPT'
 #!/usr/bin/env bash
-set -Eeo pipefail
+set -Eo pipefail
 IFS=$'\n\t'
 
 # Discover available skills in both project and global directories
@@ -133,14 +133,16 @@ process_skills_directory() {
     return 0
   fi
 
-  local len=${#location_label}
-  local underline=""
-  for ((i=0; i<len; i++)); do
-    underline+="="
-  done
-
   echo "$location_label ($count skill(s)):"
-  echo "$underline"
+  # Generate underline matching label length
+  local len=${#location_label}
+  if [[ $len -gt 0 ]]; then
+    local underline=""
+    for ((i=0; i<len; i++)); do
+      underline+="="
+    done
+    echo "$underline"
+  fi
   echo ""
 
   # Iterate SKILL.md files robustly (handles spaces)
