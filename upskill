@@ -11,16 +11,18 @@ ${PROGRAM_NAME} ${VERSION}
 Install Claude/Agent skills from another GitHub repository.
 
 Usage:
-  ${PROGRAM_NAME} [-i] <owner/repo> [-b <branch>] [--skills-path <path>] [--list] [--skill <name>] [--all]
+  ${PROGRAM_NAME} [-i] [-g] <owner/repo> [-b <branch>] [--skills-path <path>] [--list] [--skill <name>] [--all]
 
 Examples:
   ${PROGRAM_NAME} adobe/helix-website -b agent-skills
   ${PROGRAM_NAME} anthropics/skills --list
   ${PROGRAM_NAME} anthropics/skills --skill pdf --skill xlsx
   ${PROGRAM_NAME} anthropics/skills --all
+  ${PROGRAM_NAME} -g anthropics/skills --skill pdf  # Install to ~/.claude/skills
 
 Options:
   -i                        Add created files to .gitignore
+  -g, --global              Install skills to ~/.claude/skills (personal skills)
   -b, --branch <branch>     Branch, tag, or commit to clone (default: repo default)
   --skills-path <path>      Path to skills in source repo (default: .claude/skills)
   --list                    List available skills without installing
@@ -104,51 +106,91 @@ insert_or_replace_block() {
 generate_discover_skills() {
   cat <<'SCRIPT'
 #!/usr/bin/env bash
-set -Eeo pipefail
+set -Eo pipefail
 IFS=$'\n\t'
 
-# Discover available skills in .claude/skills/
+# Discover available skills in both project and global directories
 # Usage: .agents/discover-skills
 
-SKILLS_DIR="${SKILLS_DIR:-.claude/skills}"
+PROJECT_SKILLS_DIR=".claude/skills"
+GLOBAL_SKILLS_DIR="$HOME/.claude/skills"
 
-if [[ ! -d "$SKILLS_DIR" ]]; then
-  echo "No skills directory found at $SKILLS_DIR"
-  exit 0
-fi
+process_skills_directory() {
+  local skills_dir="$1"
+  local location_label="$2"
+
+  if [[ ! -d "$skills_dir" ]]; then
+    return 0
+  fi
+
+  local count=0
+  # Count skills first
+  while IFS= read -r -d '' skill_file; do
+    ((count++))
+  done < <(find "$skills_dir" -type f -name 'SKILL.md' -print0)
+
+  if [[ $count -eq 0 ]]; then
+    return 0
+  fi
+
+  echo "$location_label ($count skill(s)):"
+  # Generate underline matching label length
+  local len=${#location_label}
+  if [[ $len -gt 0 ]]; then
+    local underline=""
+    for ((i=0; i<len; i++)); do
+      underline+="="
+    done
+    echo "$underline"
+  fi
+  echo ""
+
+  # Iterate SKILL.md files robustly (handles spaces)
+  while IFS= read -r -d '' skill_file; do
+    skill_dir=$(dirname "$skill_file")
+    skill_name=$(basename "$skill_dir")
+
+    # Check for YAML frontmatter
+    if head -n 1 "$skill_file" | grep -q "^---$"; then
+      # Extract lines between first pair of --- delimiters
+      frontmatter=$(awk 'BEGIN{inside=0; c=0} /^---$/ {inside=!inside; if(++c==3) exit} inside==1 {print}' "$skill_file")
+      name=$(printf '%s\n' "$frontmatter" | awk -F': *' '/^name:/ {sub(/^name: */,"",$0); print substr($0, index($0,$2))}' 2>/dev/null)
+      description=$(printf '%s\n' "$frontmatter" | awk -F': *' '/^description:/ {sub(/^description: */,"",$0); print substr($0, index($0,$2))}' 2>/dev/null)
+
+      echo "Skill: ${name:-$skill_name}"
+      echo "Path: $skill_file"
+      if [[ -n "$description" ]]; then
+        echo "Description: $description"
+      fi
+    else
+      echo "Skill: $skill_name"
+      echo "Path: $skill_file"
+      echo "Description:"
+      head -n 5 "$skill_file"
+    fi
+
+    echo ""
+    echo "---"
+    echo ""
+  done < <(find "$skills_dir" -type f -name 'SKILL.md' -print0)
+}
 
 echo "Available Skills:"
 echo "=================="
 echo ""
 
-# Iterate SKILL.md files robustly (handles spaces)
-while IFS= read -r -d '' skill_file; do
-  skill_dir=$(dirname "$skill_file")
-  skill_name=$(basename "$skill_dir")
+# Check project skills
+process_skills_directory "$PROJECT_SKILLS_DIR" "Project Skills (.claude/skills)"
 
-  # Check for YAML frontmatter
-  if head -n 1 "$skill_file" | grep -q "^---$"; then
-    # Extract lines between first pair of --- delimiters
-    frontmatter=$(awk 'BEGIN{inside=0; c=0} /^---$/ {inside=!inside; if(++c==3) exit} inside==1 {print}' "$skill_file")
-    name=$(printf '%s\n' "$frontmatter" | awk -F': *' '/^name:/ {sub(/^name: */,"",$0); print substr($0, index($0,$2))}' 2>/dev/null)
-    description=$(printf '%s\n' "$frontmatter" | awk -F': *' '/^description:/ {sub(/^description: */,"",$0); print substr($0, index($0,$2))}' 2>/dev/null)
+# Check global skills
+process_skills_directory "$GLOBAL_SKILLS_DIR" "Personal Skills (~/.claude/skills)"
 
-    echo "Skill: ${name:-$skill_name}"
-    echo "Path: $skill_file"
-    if [[ -n "$description" ]]; then
-      echo "Description: $description"
-    fi
-  else
-    echo "Skill: $skill_name"
-    echo "Path: $skill_file"
-    echo "Description:"
-    head -n 5 "$skill_file"
-  fi
-
-  echo ""
-  echo "---"
-  echo ""
-done < <(find "$SKILLS_DIR" -type f -name 'SKILL.md' -print0)
+# If no skills found at all
+if [[ ! -d "$PROJECT_SKILLS_DIR" && ! -d "$GLOBAL_SKILLS_DIR" ]]; then
+  echo "No skills directories found."
+  echo "- Project skills: $PROJECT_SKILLS_DIR"
+  echo "- Personal skills: $GLOBAL_SKILLS_DIR"
+fi
 SCRIPT
 }
 
@@ -262,6 +304,7 @@ main() {
   local add_to_gitignore=""
   local list_only=""
   local install_all=""
+  local global_install=""
   local -a selected_skills=()
 
   while [[ $# -gt 0 ]]; do
@@ -270,6 +313,7 @@ main() {
       -v|--version) echo "$PROGRAM_NAME $VERSION"; exit 0 ;;
       -q|--quiet) QUIET=1; shift ;;
       -i) add_to_gitignore=1; shift ;;
+      -g|--global) global_install=1; shift ;;
       -b|--branch) branch="$2"; shift 2 ;;
       --skills-path) skills_rel_path="$2"; shift 2 ;;
       --list) list_only=1; shift ;;
@@ -336,7 +380,12 @@ main() {
   fi
 
   local dest_skills_dir
-  dest_skills_dir=".claude/skills"
+  if [[ -n "$global_install" ]]; then
+    dest_skills_dir="$HOME/.claude/skills"
+    log "Installing skills globally to $dest_skills_dir"
+  else
+    dest_skills_dir=".claude/skills"
+  fi
   mkdir -p "$dest_skills_dir"
 
   # Install skills based on mode
@@ -398,46 +447,49 @@ main() {
     log "Installed $skill_count skill(s)"
   fi
 
-  # Write .agents/discover-skills
-  mkdir -p .agents
-  local discover
-  discover=".agents/discover-skills"
-  log "Updating $discover ..."
-  generate_discover_skills >"$discover"
-  chmod +x "$discover"
+  # For local installs, write .agents/discover-skills and update AGENTS.md
+  if [[ -z "$global_install" ]]; then
+    # Write .agents/discover-skills
+    mkdir -p .agents
+    local discover
+    discover=".agents/discover-skills"
+    log "Updating $discover ..."
+    generate_discover_skills >"$discover"
+    chmod +x "$discover"
 
-  # Extract Skills section from source AGENTS.md
-  local src_agents
-  src_agents="$clone_dir/AGENTS.md"
-  if [[ -f "$src_agents" ]]; then
-    log "Updating AGENTS.md skills section ..."
-    local block
-    block=$(awk '/^## Skills/{flag=1; print; next} /^## / && flag{exit} flag{print}' "$src_agents")
-    if [[ -z "$block" ]]; then
-      log "Warning: could not extract Skills section from $src_agents"
+    # Extract Skills section from source AGENTS.md
+    local src_agents
+    src_agents="$clone_dir/AGENTS.md"
+    if [[ -f "$src_agents" ]]; then
+      log "Updating AGENTS.md skills section ..."
+      local block
+      block=$(awk '/^## Skills/{flag=1; print; next} /^## / && flag{exit} flag{print}' "$src_agents")
+      if [[ -z "$block" ]]; then
+        log "Warning: could not extract Skills section from $src_agents"
+      else
+        local start_marker end_marker
+        start_marker='<!-- upskill:skills:start -->'
+        end_marker='<!-- upskill:skills:end -->'
+        insert_or_replace_block "AGENTS.md" "$start_marker" "$end_marker" <<<"$block"
+      fi
     else
-      local start_marker end_marker
-      start_marker='<!-- upskill:skills:start -->'
-      end_marker='<!-- upskill:skills:end -->'
-      insert_or_replace_block "AGENTS.md" "$start_marker" "$end_marker" <<<"$block"
+      log "Warning: AGENTS.md not found in source repo, skipping skills section"
     fi
-  else
-    log "Warning: AGENTS.md not found in source repo, skipping skills section"
-  fi
 
-  # Optionally append ignore rules
-  if [[ -n "$add_to_gitignore" ]]; then
-    local start_marker end_marker
-    start_marker="# upskill:gitignore:start"
-    end_marker="# upskill:gitignore:end"
-    local block
-    block=$(cat <<'EOB'
+    # Optionally append ignore rules
+    if [[ -n "$add_to_gitignore" ]]; then
+      local start_marker end_marker
+      start_marker="# upskill:gitignore:start"
+      end_marker="# upskill:gitignore:end"
+      local block
+      block=$(cat <<'EOB'
 .claude/skills/
 .agents/discover-skills
 EOB
 )
-    insert_or_replace_block ".gitignore" "$start_marker" "$end_marker" <<<"$block"
-    log "Updated .gitignore with upskill block"
+      insert_or_replace_block ".gitignore" "$start_marker" "$end_marker" <<<"$block"
+      log "Updated .gitignore with upskill block"
+    fi
   fi
 
   log "Done."

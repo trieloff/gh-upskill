@@ -43,6 +43,20 @@ upskill anthropics/skills --skill pdf --skill xlsx
 upskill anthropics/skills --all
 ```
 
+### Install skills globally (personal skills)
+
+Use the `-g` or `--global` flag to install skills to `~/.claude/skills` instead of the project's `.claude/skills` directory. Personal skills are available across all your Claude Code projects:
+
+**Install globally:**
+```
+upskill -g anthropics/skills --skill pdf --skill xlsx
+```
+
+When installing globally:
+- Skills are installed to `~/.claude/skills`
+- `.agents/discover-skills` and `AGENTS.md` are not modified (since these are project-specific)
+- The `-i` flag is ignored (no gitignore updates needed)
+
 ### What this does:
 - Creates a temp directory and `gh repo clone`s the source repository
 - For repos with `.claude/skills`: copies everything into `./.claude/skills`
@@ -52,6 +66,7 @@ upskill anthropics/skills --all
   - Ensures repeated runs do not duplicate the section
 
 ### Options:
+- `-g, --global`: install skills to `~/.claude/skills` (personal skills available across all projects)
 - `-b, --branch <branch>`: use a specific branch, tag, or commit
 - `--skills-path <path>`: change source skills path (default: `.claude/skills`)
 - `--list`: list available skills without installing
@@ -77,7 +92,7 @@ After installing, list available skills in your project:
 ./.agents/discover-skills
 ```
 
-This safely scans `.claude/skills/**/SKILL.md` (handles spaces) and prints names/paths/descriptions.
+This safely scans both project skills (`.claude/skills/**/SKILL.md`) and personal skills (`~/.claude/skills/**/SKILL.md`), handling spaces correctly and printing names/paths/descriptions organized by location.
 
 ## Development
 
