@@ -126,7 +126,7 @@ process_skills_directory() {
   local count=0
   # Count skills first
   while IFS= read -r -d '' skill_file; do
-    ((count++))
+    count=$((count + 1))
   done < <(find "$skills_dir" -type f -name 'SKILL.md' -print0)
 
   if [[ $count -eq 0 ]]; then
@@ -244,7 +244,7 @@ list_skills() {
   local count=0
   local -a skill_names=()
   while IFS='|' read -r name path description; do
-    ((count++))
+    count=$((count + 1))
     skill_names+=("$name")
 
     # Make path relative to search_dir
@@ -414,7 +414,7 @@ main() {
       log "Installing all $total_count skills..."
       while IFS='|' read -r name path description; do
         copy_skill "$path" "$dest_skills_dir"
-        ((skill_count++))
+        skill_count=$((skill_count + 1))
       done <"$tmpfile"
     elif [[ ${#selected_skills[@]} -gt 0 ]]; then
       log "Installing ${#selected_skills[@]} selected skill(s)..."
@@ -423,7 +423,7 @@ main() {
         while IFS='|' read -r name path description; do
           if [[ "$name" == "$skill_name" ]]; then
             copy_skill "$path" "$dest_skills_dir"
-            ((skill_count++))
+            skill_count=$((skill_count + 1))
             found=1
             break
           fi

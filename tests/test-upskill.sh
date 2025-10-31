@@ -18,7 +18,7 @@ trap cleanup EXIT
 pushd "$TMP" >/dev/null
 
 echo "Running upskill (first run) ..."
-"$ROOT_DIR/upskill" adobe/helix-website -b agent-skills
+"$ROOT_DIR/upskill" adobe/helix-website
 
 test -d .claude/skills || { echo "FAIL: .claude/skills missing"; exit 1; }
 count_skills=$(find .claude/skills -name 'SKILL.md' -type f | wc -l | tr -d ' ')
@@ -39,7 +39,7 @@ count_markers=$(grep -cF "$marker_start" AGENTS.md)
 [[ "$count_markers" == "1" ]] || { echo "FAIL: duplicate start markers on first run"; exit 1; }
 
 echo "Running upskill (second run) ..."
-"$ROOT_DIR/upskill" adobe/helix-website -b agent-skills
+"$ROOT_DIR/upskill" adobe/helix-website
 
 count_markers2=$(grep -cF "$marker_start" AGENTS.md)
 [[ "$count_markers2" == "1" ]] || { echo "FAIL: duplicate start markers after second run"; exit 1; }
@@ -51,7 +51,7 @@ echo "$out" | grep -q -- "---" || { echo "FAIL: discover-skills separator missin
 
 # Test gitignore insertion with -i
 echo "Running upskill with -i ..."
-"$ROOT_DIR/upskill" -i adobe/helix-website -b agent-skills
+"$ROOT_DIR/upskill" -i adobe/helix-website
 
 test -f .gitignore || { echo "FAIL: .gitignore not created"; exit 1; }
 grep -qF ".claude/skills/" .gitignore || { echo "FAIL: .gitignore missing skills entry"; exit 1; }
@@ -60,7 +60,7 @@ grep -qF ".agents/discover-skills" .gitignore || { echo "FAIL: .gitignore missin
 # Ensure idempotent block
 start_marker="# upskill:gitignore:start"
 [[ $(grep -cF "$start_marker" .gitignore) == "1" ]] || { echo "FAIL: duplicate gitignore block after first -i"; exit 1; }
-"$ROOT_DIR/upskill" -i adobe/helix-website -b agent-skills
+"$ROOT_DIR/upskill" -i adobe/helix-website
 [[ $(grep -cF "$start_marker" .gitignore) == "1" ]] || { echo "FAIL: duplicate gitignore block after second -i"; exit 1; }
 
 echo "OK"
