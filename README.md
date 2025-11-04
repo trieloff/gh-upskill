@@ -23,7 +23,7 @@ Quickly install Claude/Agent skills from another repository. Works standalone an
 Install all skills from another repo (same syntax as `gh repo clone`):
 
 ```
-upskill adobe/helix-website -b agent-skills
+upskill adobe/helix-website
 ```
 
 ### Install from repositories with individual SKILL.md files
